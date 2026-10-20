@@ -1,0 +1,102 @@
+# ESPHome KMS server — native ESPHome port of vlmcsd (cf. mikolatero/docker-vlmcsd).
+# Use with Home Assistant ESPHome add-on: copy this file + `components/` into
+# /config/esphome/, edit Wi-Fi secrets, Install.
+#
+# Legal: for activating licenses you own (e.g. re-activation after HW change).
+# Uses Microsoft-published GVLK keys on the client side; no keys ship here.
+#
+# Native ESPHome features used (no Arduino WebServer / WiFiManager):
+# - wifi + ap + captive_portal for provisioning (replaces WiFiManager)
+# - web_server (:80) + api for HA dashboard (replaces kms_web.cpp :80 UI)
+# - time/sntp for wall-clock timestamps, logger for activation logs
+# - kms_server sensors below for count / last product / client / version / time
+
+substitutions:
+  device_name: kms-server
+  friendly_name: KMS Server
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+  # Reboot after 15 min if Wi-Fi/API down — keeps an "always-on" KMS reachable.
+  on_boot:
+    priority: -100
+    then:
+      - logger.log: "KMS server booted, waiting for network"
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+# Enable logging (INFO to see activations, DEBUG for per-client connects)
+logger:
+  level: INFO
+
+# Connect to your LAN — KMS clients must reach TCP 1688 on this IP.
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "Kms-Server Fallback"
+    password: "kms12345678"
+
+captive_portal:
+
+api:
+ota:
+  - platform: esphome
+
+# Native HA dashboard (:80) — replaces the Arduino kms_web.cpp UI.
+web_server:
+  port: 80
+
+# Wall clock for "last activation" timestamps. Falls back to uptime if unsynced.
+time:
+  - platform: sntp
+    id: sntp_time
+
+sensor:
+  - platform: uptime
+    name: "KMS uptime"
+  - platform: wifi_signal
+    name: "KMS WiFi signal"
+    update_interval: 60s
+
+text_sensor:
+  - platform: version
+    name: "KMS ESPHome version"
+
+button:
+  - platform: restart
+    name: "KMS restart"
+
+# Local external component (this repo's components/kms_server).
+# Path is relative to your ESPHome config dir. If you copied kms.yaml to
+# /config/esphome/kms-server.yaml, copy components/ to /config/esphome/components/
+# so the layout is:
+#   /config/esphome/kms-server.yaml
+#   /config/esphome/components/kms_server/...
+external_components:
+  - source:
+      type: local
+      path: components
+
+# --- KMS server on TCP 1688 (docker-vlmcsd equivalent: `-p 1688:1688`) ---
+# Sensors are optional — omit any you don't want in HA, the server still works
+# and still logs every activation. History depth is "last activation"
+# (HA itself keeps long-term statistics); no Arduino ring buffer needed.
+kms_server:
+  port: 1688
+  activation_interval: 120    # min, vlmcsd -A default 2h
+  renewal_interval: 10080     # min, vlmcsd -R default 7d
+  activation_count:
+    name: "KMS activation count"
+  last_product:
+    name: "KMS last product"
+  last_client:
+    name: "KMS last client"
+  last_version:
+    name: "KMS last version"
+  last_time:
+    name: "KMS last time"

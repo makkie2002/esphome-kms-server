@@ -1,0 +1,86 @@
+# Minimal user config that pulls kms_server from GitHub.
+# Copy this to /config/esphome/kms-server.yaml in the HA ESPHome add-on,
+# replace GITHUB_USER/GITHUB_REPO, add wifi secrets, Install.
+#
+# Repo layout expected (this is what kms-esphome already is):
+#   <repo root>/
+#     components/kms_server/__init__.py
+#     components/kms_server/kms_server.h
+#     components/kms_server/kms_server.cpp
+#     components/kms_server/kms.c, rpc.c, ... (flat, incl. headers)
+
+substitutions:
+  device_name: kms-server
+  friendly_name: KMS Server
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+  on_boot:
+    priority: -100
+    then:
+      - logger.log: "KMS server booted, waiting for network"
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+logger:
+  level: INFO
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "Kms-Server Fallback"
+    password: "kms12345678"
+
+captive_portal:
+
+api:
+ota:
+  - platform: esphome
+
+web_server:
+  port: 80
+
+time:
+  - platform: sntp
+    id: sntp_time
+
+sensor:
+  - platform: uptime
+    name: "KMS uptime"
+  - platform: wifi_signal
+    name: "KMS WiFi signal"
+    update_interval: 60s
+
+text_sensor:
+  - platform: version
+    name: "KMS ESPHome version"
+
+button:
+  - platform: restart
+    name: "KMS restart"
+
+external_components:
+  # Pin to a tag/branch. Use `ref: main` while iterating, then pin e.g. `ref: v1.0.0`.
+  - source: github://GITHUB_USER/GITHUB_REPO@main
+    components: [kms_server]
+    refresh: 1d
+
+kms_server:
+  port: 1688
+  activation_interval: 120
+  renewal_interval: 10080
+  activation_count:
+    name: "KMS activation count"
+  last_product:
+    name: "KMS last product"
+  last_client:
+    name: "KMS last client"
+  last_version:
+    name: "KMS last version"
+  last_time:
+    name: "KMS last time"

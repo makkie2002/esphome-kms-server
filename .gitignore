@@ -1,0 +1,13 @@
+# ESPHome / secrets / OS
+secrets.yaml
+.esphome/
+build/
+*.bin
+*.elf
+*.map
+
+# Arduino / PlatformIO leftovers (if you ever compile locally)
+.vscode/
+__pycache__/
+*.pyc
+.DS_Store
